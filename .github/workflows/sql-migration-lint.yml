@@ -1,0 +1,260 @@
+name: SQL Migration Lint
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**/*.sql'
+
+jobs:
+  lint-migrations:
+    name: lint-migrations
+    runs-on: ["self-hosted", "linux", "superoptimizers", "lint-migrations"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed migration files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            supabase/migrations/**/*.sql
+
+      - name: Setup Bun
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: oven-sh/setup-bun@v2
+
+      - name: Lint migration files
+        if: steps.changed-files.outputs.any_changed == 'true'
+        env:
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+          ADDED_FILES: ${{ steps.changed-files.outputs.added_files }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          bun -e '
+          import { execFileSync } from "node:child_process";
+          import { existsSync, readFileSync, statSync } from "node:fs";
+          import { basename } from "node:path";
+
+          const files = (process.env.CHANGED_FILES ?? "")
+            .split(/\s+/)
+            .filter(Boolean)
+            .filter((file) => file.endsWith(".sql"))
+            .sort();
+          if (files.length === 0) {
+            console.log("No changed SQL migration files found, skipping migration lint.");
+            process.exit(0);
+          }
+          const addedFiles = new Set(
+            (process.env.ADDED_FILES ?? "")
+              .split(/\s+/)
+              .filter(Boolean)
+              .filter((file) => file.endsWith(".sql")),
+          );
+
+          const filenamePattern = /^\d{14}_[a-z0-9][a-z0-9_-]*\.sql$/;
+          const migrationTimestampPattern = /^(\d{14})_/;
+          const sqlIdentifier = String.raw`"[^"]+"|[A-Za-z_][A-Za-z0-9_]*`;
+          const createTablePattern = new RegExp(
+            String.raw`^\s*CREATE\s+(?:(?<temp>TEMP|TEMPORARY)\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:(?<schema>${sqlIdentifier})\s*\.\s*)?(?<table>${sqlIdentifier})\s*\(`,
+            "gim",
+          );
+          const enableRlsPattern = new RegExp(
+            String.raw`^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(?:(?<schema>${sqlIdentifier})\s*\.\s*)?(?<table>${sqlIdentifier})\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY\b`,
+            "gim",
+          );
+          const rlsDisableCommentPattern = /--\s*rls-lint:\s*disable/i;
+          const seenTimestamps = new Set();
+          const errors = [];
+
+          const getBaseMigrationFiles = () => {
+            const baseRef = process.env.BASE_REF || "main";
+            try {
+              return execFileSync(
+                "git",
+                [
+                  "ls-tree",
+                  "-r",
+                  "--name-only",
+                  `origin/${baseRef}`,
+                  "supabase/migrations",
+                ],
+                { encoding: "utf8" },
+              )
+                .split(/\s+/)
+                .filter(Boolean)
+                .filter((file) => file.endsWith(".sql"));
+            } catch (error) {
+              console.warn(
+                `Warning: could not inspect base migration history for origin/${baseRef}; skipping added-migration timestamp ordering check.`,
+              );
+              return [];
+            }
+          };
+
+          const baseMigrationTimestamps = getBaseMigrationFiles()
+            .map((file) => basename(file).match(migrationTimestampPattern)?.[1])
+            .filter(Boolean)
+            .sort();
+          const existingMigrationTimestamps = new Set(baseMigrationTimestamps);
+          const latestExistingMigrationTimestamp =
+            baseMigrationTimestamps.at(-1) ?? null;
+
+          const normalizeIdentifier = (identifier) => {
+            if (!identifier) {
+              return "";
+            }
+            const trimmed = identifier.trim();
+            if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+              return trimmed.slice(1, -1);
+            }
+            return trimmed.toLowerCase();
+          };
+
+          const extractTableIdentifier = (match) => [
+            normalizeIdentifier(match.groups?.schema),
+            normalizeIdentifier(match.groups?.table),
+          ];
+
+          const isSystemTable = (tableName) =>
+            tableName.startsWith("_") || tableName.startsWith("pg_");
+
+          const findTableSet = (content, pattern) => {
+            const tableSet = new Set();
+            for (const match of content.matchAll(pattern)) {
+              const [schema, table] = extractTableIdentifier(match);
+              tableSet.add(`${schema}.${table}`);
+            }
+            return tableSet;
+          };
+
+          const getExpectedTableKeys = (schema, table) => {
+            if (schema === "") {
+              return [`.${table}`, `public.${table}`];
+            }
+            if (schema === "public") {
+              return [`public.${table}`, `.${table}`];
+            }
+            return [`${schema}.${table}`];
+          };
+
+          const hasDisableComment = (content, match) => {
+            const createOffset = match[0].toUpperCase().indexOf("CREATE");
+            const createIndex = (match.index ?? 0) + createOffset;
+            const lineStart = content.lastIndexOf("\n", createIndex - 1) + 1;
+            let lineEnd = content.indexOf("\n", createIndex);
+            if (lineEnd === -1) {
+              lineEnd = content.length;
+            }
+
+            const currentLine = content.slice(lineStart, lineEnd);
+            if (rlsDisableCommentPattern.test(currentLine)) {
+              return true;
+            }
+
+            let searchEnd = lineStart - 1;
+
+            while (searchEnd >= 0) {
+              const prevLineStart = content.lastIndexOf("\n", searchEnd - 1) + 1;
+              const previousLine = content.slice(prevLineStart, searchEnd);
+              const strippedLine = previousLine.trim();
+
+              if (!strippedLine) {
+                searchEnd = prevLineStart - 1;
+                continue;
+              }
+
+              return rlsDisableCommentPattern.test(previousLine);
+            }
+
+            return false;
+          };
+
+          const isTempTable = (match) => Boolean(match.groups?.temp);
+
+          for (const file of files) {
+            const fullPath = file;
+            const filename = basename(file);
+            if (!existsSync(fullPath)) {
+              console.warn(`Warning: ${file} does not exist, skipping`);
+              continue;
+            }
+            const stats = statSync(fullPath);
+
+            if (!filenamePattern.test(filename)) {
+              errors.push(
+                `${file}: expected format YYYYMMDDHHMMSS_description.sql using lowercase letters, numbers, and underscores.`,
+              );
+            }
+
+            const [timestamp] = filename.split("_", 1);
+            if (seenTimestamps.has(timestamp)) {
+              errors.push(`${file}: duplicate migration timestamp ${timestamp}.`);
+            }
+            seenTimestamps.add(timestamp);
+
+            if (addedFiles.has(file) && filenamePattern.test(filename)) {
+              if (existingMigrationTimestamps.has(timestamp)) {
+                errors.push(
+                  `${file}: duplicate migration timestamp ${timestamp}; an existing migration already uses that timestamp.`,
+                );
+              }
+              if (
+                latestExistingMigrationTimestamp !== null &&
+                timestamp < latestExistingMigrationTimestamp
+              ) {
+                errors.push(
+                  `${file}: migration timestamp ${timestamp} is older than existing migration timestamp ${latestExistingMigrationTimestamp}; create new migrations with supabase migration new so they sort after current history.`,
+                );
+              }
+            }
+
+            if (stats.size === 0) {
+              errors.push(`${file}: file is empty.`);
+              continue;
+            }
+
+            const contents = readFileSync(fullPath, "utf8").trim();
+            if (contents.length === 0) {
+              errors.push(`${file}: file only contains whitespace.`);
+              continue;
+            }
+
+            const tablesWithRls = findTableSet(contents, enableRlsPattern);
+
+            for (const match of contents.matchAll(createTablePattern)) {
+              const [schema, table] = extractTableIdentifier(match);
+              if (!table || isSystemTable(table)) {
+                continue;
+              }
+              if (isTempTable(match)) {
+                continue;
+              }
+              if (hasDisableComment(contents, match)) {
+                continue;
+              }
+
+              const expectedKeys = getExpectedTableKeys(schema, table);
+
+              if (
+                !expectedKeys.some((expectedKey) => tablesWithRls.has(expectedKey))
+              ) {
+                errors.push(
+                  `${file}: CREATE TABLE ${match[0].trim()} missing ALTER TABLE ... ENABLE ROW LEVEL SECURITY.`,
+                );
+              }
+
+            }
+          }
+
+          if (errors.length > 0) {
+            console.error("SQL migration lint failed:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log(`Validated ${files.length} changed SQL migration file(s).`);
+          '

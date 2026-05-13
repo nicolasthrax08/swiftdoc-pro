@@ -1,0 +1,42 @@
+name: Protect Applied Supabase Migrations
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'supabase/migrations/**'
+
+jobs:
+  check-migration-integrity:
+    runs-on: ["self-hosted", "linux", "superoptimizers", "check-migration-integrity"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for deleted or renamed migrations
+        run: |
+          echo "Checking for deleted or renamed migration files..."
+
+          # Get the list of deleted or renamed files in supabase/migrations/
+          DELETED_OR_RENAMED=$(git diff --name-only --diff-filter=DR origin/${{ github.base_ref }}...HEAD -- supabase/migrations/)
+
+          if [ -n "$DELETED_OR_RENAMED" ]; then
+            echo "❌ ERROR: Applied Supabase migration files cannot be deleted or renamed!"
+            echo ""
+            echo "The following migration files were deleted or renamed:"
+            echo "$DELETED_OR_RENAMED" | sed 's/^/  - /'
+            echo ""
+            echo "Applied migrations represent the database schema history and must remain immutable."
+            echo "If you need to change the database schema, please create a new forward migration instead."
+            echo ""
+            echo "To fix this PR:"
+            echo "  1. Restore the deleted/renamed migration files"
+            echo "  2. Create a new migration file with your desired schema changes"
+            echo "  3. Use 'supabase migration new <description>' to generate a new migration"
+            exit 1
+          fi
+
+          echo "✅ No applied migrations were deleted or renamed. Check passed!"

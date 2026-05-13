@@ -1,0 +1,89 @@
+name: Staging DB Migration Rollback
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.base.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    if: github.event.pull_request.merged == true
+    runs-on: ["self-hosted", "linux", "superoptimizers", "staging-db-migration-rollback"]
+    permissions:
+      id-token: write
+      pull-requests: read
+    steps:
+      - name: Detect revert PR migration deletions
+        id: detect
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pullRequest = context.payload.pull_request;
+            const title = pullRequest?.title ?? "";
+            const body = pullRequest?.body ?? "";
+            const isGitHubRevert =
+              title.startsWith('Revert "') &&
+              body.includes('This reverts commit ');
+
+            if (!isGitHubRevert) {
+              core.setOutput("should_rollback", "false");
+              return;
+            }
+
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pullRequest.number,
+                per_page: 100,
+              }
+            );
+
+            const deletedMigrations = files.filter((file) =>
+              file.status === "removed" &&
+              file.filename.startsWith("supabase/migrations/") &&
+              file.filename.endsWith(".sql")
+            );
+
+            core.setOutput(
+              "should_rollback",
+              deletedMigrations.length > 0 ? "true" : "false"
+            );
+
+      - name: Request OIDC token
+        if: steps.detect.outputs.should_rollback == 'true'
+        id: oidc
+        run: |
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=api.superoptimizers.cofounder.co" | jq -r '.value')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Roll back reverted migrations
+        if: steps.detect.outputs.should_rollback == 'true'
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          PULL_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          response_file=$(mktemp)
+          status_code=$(curl -sS -o "$response_file" -w "%{http_code}" -X POST \
+            https://api.superoptimizers.cofounder.co/migrations/v1/rollback-reverted \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"pull_number\":$PULL_NUMBER}")
+          if [ "$status_code" -ge 400 ]; then
+            echo "Migration rollback API failed with status $status_code"
+            cat "$response_file"
+            rm -f "$response_file"
+            exit 1
+          fi
+          cat "$response_file"
+          rm -f "$response_file"

@@ -1,0 +1,45 @@
+name: Staging DB Migration
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.base.ref }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: github.event.pull_request.merged == true
+    runs-on: ["self-hosted", "linux", "superoptimizers", "staging-db-migration"]
+    permissions:
+      id-token: write
+    steps:
+      - name: Request OIDC token
+        id: oidc
+        run: |
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=api.superoptimizers.cofounder.co" | jq -r '.value')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Run migrations
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+        run: |
+          response_file=$(mktemp)
+          status_code=$(curl -sS -o "$response_file" -w "%{http_code}" -X POST \
+            https://api.superoptimizers.cofounder.co/migrations/v1/run \
+            -H "Authorization: Bearer $OIDC_TOKEN")
+          if [ "$status_code" -ge 400 ]; then
+            echo "Migration API failed with status $status_code"
+            cat "$response_file"
+            rm -f "$response_file"
+            exit 1
+          fi
+          cat "$response_file"
+          rm -f "$response_file"

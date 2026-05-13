@@ -29,8 +29,8 @@
  * set so the absolute URL can be constructed.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
+import { type NextRequest, NextResponse } from "next/server";
+import crypto from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendFilingFailureNotification } from "@/lib/filing/notifications";
 import {

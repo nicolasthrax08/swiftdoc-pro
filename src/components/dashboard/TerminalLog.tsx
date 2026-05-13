@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { FilingJob, AuditLogEntry } from "@/lib/supabase/types";
 import { useMountEffect } from "@/hooks/useMountEffect";
@@ -66,22 +66,28 @@ export function TerminalLog({ initialJob }: TerminalLogProps) {
     return [jobToStatusLine(initialJob), ...auditLines];
   });
 
-  // Callback ref — called whenever the div mounts or lines change
+  // Stable ref to the scroll container; scroll to bottom whenever lines update
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useCallback((node: HTMLDivElement | null) => {
-    if (node) {
-      node.scrollTop = node.scrollHeight;
-    }
-  }, [lines]); // re-run on every lines change to scroll to bottom
+    scrollContainerRef.current = node;
+  }, []);
+
+  function applyJobAndScroll(job: FilingJob) {
+    const auditLines = (job.audit_log ?? []).map(auditEntryToLogLine);
+    setActiveJob(job);
+    setLines([jobToStatusLine(job), ...auditLines]);
+    // Defer so the DOM has updated before we scroll
+    setTimeout(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop =
+          scrollContainerRef.current.scrollHeight;
+      }
+    }, 0);
+  }
 
   useMountEffect(() => {
     const supabase = createClient();
     let pollInterval: ReturnType<typeof setInterval> | null = null;
-
-    function applyJob(job: FilingJob) {
-      setActiveJob(job);
-      const auditLines = (job.audit_log ?? []).map(auditEntryToLogLine);
-      setLines([jobToStatusLine(job), ...auditLines]);
-    }
 
     async function fetchActiveJob() {
       // Prefer active job first
@@ -94,7 +100,7 @@ export function TerminalLog({ initialJob }: TerminalLogProps) {
         .maybeSingle();
 
       if (active) {
-        applyJob(active as FilingJob);
+        applyJobAndScroll(active as FilingJob);
         return;
       }
 
@@ -107,7 +113,7 @@ export function TerminalLog({ initialJob }: TerminalLogProps) {
         .maybeSingle();
 
       if (recent) {
-        applyJob(recent as FilingJob);
+        applyJobAndScroll(recent as FilingJob);
       } else {
         setActiveJob(null);
         setLines([]);
@@ -121,7 +127,7 @@ export function TerminalLog({ initialJob }: TerminalLogProps) {
         "postgres_changes",
         { event: "*", schema: "public", table: "filing_jobs" },
         (payload) => {
-          applyJob(payload.new as FilingJob);
+          applyJobAndScroll(payload.new as FilingJob);
         }
       )
       .subscribe((status) => {
@@ -252,8 +258,8 @@ export function TerminalLog({ initialJob }: TerminalLogProps) {
             {"> "}No active filing in progress. Waiting for next job…
           </p>
         ) : (
-          lines.map((line, i) => (
-            <div key={i} className="flex items-start gap-3">
+          lines.map((line) => (
+            <div key={`${line.ts}-${line.action}`} className="flex items-start gap-3">
               <span
                 style={{ color: "#243447", flexShrink: 0, minWidth: 70 }}
               >

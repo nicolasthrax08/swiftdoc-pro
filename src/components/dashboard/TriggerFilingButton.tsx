@@ -46,6 +46,7 @@ export function TriggerFilingButton({
   return (
     <div className="flex flex-col gap-2">
       <button
+        type="button"
         onClick={handleTrigger}
         disabled={disabled || state === "loading" || state === "success"}
         className="inline-flex items-center gap-2 rounded px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"

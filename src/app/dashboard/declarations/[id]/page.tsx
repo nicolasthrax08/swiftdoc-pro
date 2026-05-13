@@ -346,8 +346,8 @@ export default async function DeclarationDetailPage({
                         fontSize: 11,
                       }}
                     >
-                      {job.audit_log.map((entry, i) => (
-                        <div key={i} className="flex gap-3">
+                      {job.audit_log.map((entry) => (
+                        <div key={`${entry.ts}-${entry.stage}`} className="flex gap-3">
                           <span style={{ color: "#243447", flexShrink: 0 }}>
                             {new Date(entry.ts).toLocaleTimeString("en-HK", {
                               hour12: false,

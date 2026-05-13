@@ -14,7 +14,7 @@
 // 1. HKHS Code Validator
 // ----------------------------------------------------------------
 
-const HKHS_CODE_REGEX = /^\d{8}$/;
+const HKHS_REGEX = /^\d{8}$/;
 
 export interface HKHSValidationResult {
   valid: boolean;
@@ -37,7 +37,7 @@ export function validateHKHSCode(code: string): HKHSValidationResult {
   if (code.length === 0) {
     return { valid: false, error: "HS code must not be empty" };
   }
-  if (!HKHS_CODE_REGEX.test(code)) {
+  if (!HKHS_REGEX.test(code)) {
     return {
       valid: false,
       error: "HS code must be exactly 8 numeric digits (e.g. 12345678)",
@@ -76,8 +76,8 @@ export function calculateAdValorem(totalValueHKD: number): AdValoremResult {
   }
 
   const rawTax = totalValueHKD * AD_VALOREM_RATE;
+  const tax = round2(Math.max(AD_VALOREM_FLOOR, rawTax));
   const floor_applied = rawTax < AD_VALOREM_FLOOR;
-  const tax = round2(floor_applied ? AD_VALOREM_FLOOR : rawTax);
 
   return {
     tax,

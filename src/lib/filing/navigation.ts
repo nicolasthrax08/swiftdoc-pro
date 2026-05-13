@@ -25,6 +25,7 @@
  * └──────────────────────────────────────────────────────────────────────┘
  */
 
+import { REVIEW_DECLARATION_APPROVAL_GATE_SCRIPT } from "@/lib/automation/payload";
 import type { SkyvernCreateTaskRequest } from "@/lib/skyvern/types";
 import type { TdecFormData } from "@/lib/skyvern/types";
 import type { TradelinkCredential } from "./credentials";
@@ -80,17 +81,20 @@ export function buildTdecFilingTask(
     navigation_goal: buildNavigationGoal(formData),
 
     data_extraction_goal:
-      "After the form is submitted successfully, extract the " +
-      "Tradelink / Ge-TS confirmation reference number shown on the " +
-      "confirmation page. Return it as { tradelink_ref: '...' }. " +
-      "If the submission failed, return the displayed error message as " +
-      "{ error: '...' }.",
+      "If the automation stopped at the Review Declaration safety gate, return " +
+      "{ review_declaration_pending: true, review_declaration_screenshot_url: '...' } " +
+      "when a screenshot URL is available (omit the URL key if not). " +
+      "After a successful full submission past Review, extract the Tradelink / Ge-TS " +
+      "confirmation reference as { tradelink_ref: '...' }. " +
+      "If the submission failed, return the displayed error message as { error: '...' }.",
 
     extracted_information_schema: {
       type: "object",
       properties: {
         tradelink_ref: { type: "string" },
         error: { type: "string" },
+        review_declaration_pending: { type: "boolean" },
+        review_declaration_screenshot_url: { type: "string" },
       },
     },
 
@@ -126,7 +130,12 @@ export function buildTdecFilingTask(
 // ----------------------------------------------------------------
 
 function buildNavigationGoal(formData: TdecFormData): string {
-  return [
+  const adValoremLine =
+    formData.ad_valorem_tax_hkd != null
+      ? "   - Ad valorem tax (HKD): navigation_payload.ad_valorem_tax_hkd"
+      : null;
+
+  const lines = [
     "1. Navigate to the Tradelink / Ge-TS portal login page.",
     "2. Enter the username from navigation_payload.username and password " +
       "from navigation_payload.password into the login form and click Login.",
@@ -141,14 +150,17 @@ function buildNavigationGoal(formData: TdecFormData): string {
     "   - Country of origin: navigation_payload.country_of_origin",
     "   - Country of destination: navigation_payload.country_of_destination",
     "   - HS code: navigation_payload.hs_code",
+    adValoremLine,
     "   - Goods description: navigation_payload.goods_description",
     "   - Quantity: navigation_payload.quantity",
     "   - Unit: navigation_payload.unit",
     "   - Declared value (HKD): navigation_payload.value_hkd",
-    "7. Review all filled fields for accuracy before submitting.",
-    "8. Click the Submit / Confirm button.",
-    "9. Wait for the confirmation page and note the reference number.",
-  ].join("\n");
+    "7. Advance through the wizard until the \"Review Declaration\" screen " +
+      "(final review / summary immediately before any control that transmits the filing).",
+    "8. Execute the SAFETY GATE instructions below — do not finalise the declaration without human approval.",
+  ].filter((line): line is string => line != null);
+
+  return `${lines.join("\n")}\n\n${REVIEW_DECLARATION_APPROVAL_GATE_SCRIPT}`;
 }
 
 function sanitisedFormPayload(
@@ -168,6 +180,7 @@ function sanitisedFormPayload(
     quantity,
     unit,
     value_hkd,
+    ad_valorem_tax_hkd,
     duty_rate,
   } = formData;
 
@@ -183,6 +196,9 @@ function sanitisedFormPayload(
     quantity,
     unit,
     value_hkd,
+    ...(ad_valorem_tax_hkd !== undefined
+      ? { ad_valorem_tax_hkd }
+      : {}),
     ...(duty_rate !== undefined ? { duty_rate } : {}),
   };
 }

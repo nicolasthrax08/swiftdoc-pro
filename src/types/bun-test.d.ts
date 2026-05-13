@@ -8,9 +8,22 @@
 declare module "bun:test" {
   type AnyFn = (...args: unknown[]) => unknown;
 
+  export interface TestOptions {
+    timeout?: number;
+  }
+
   export function describe(name: string, fn: () => void): void;
+  export namespace describe {
+    export function skip(name: string, fn: () => void): void;
+  }
+
   export function it(name: string, fn: () => void | Promise<void>): void;
   export function test(name: string, fn: () => void | Promise<void>): void;
+  export function test(
+    options: TestOptions,
+    name: string,
+    fn: () => void | Promise<void>,
+  ): void;
   export function beforeAll(fn: () => void | Promise<void>): void;
   export function afterAll(fn: () => void | Promise<void>): void;
   export function beforeEach(fn: () => void | Promise<void>): void;
@@ -29,6 +42,7 @@ declare module "bun:test" {
     toBeLessThanOrEqual(n: number): void;
     toBeGreaterThanOrEqual(n: number): void;
     toMatch(pattern: string | RegExp): void;
+    toBeCloseTo(expected: number, numDigits?: number): void;
     toThrow(expected?: unknown): void;
     toContain(item: unknown): void;
     toHaveLength(n: number): void;

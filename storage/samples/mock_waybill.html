@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shipping Waybill – SF Express (HK)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Noto+Sans+HK:wght@400;500;700&display=swap');
+
+  :root {
+    --red:    #C0272D;
+    --dark:   #1A1A1A;
+    --mid:    #3D3D3D;
+    --light:  #F5F3EE;
+    --border: #2A2A2A;
+    --gold:   #B8972A;
+    --warn:   #C0272D;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #E8E4DC;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 40px 20px;
+    font-family: 'IBM Plex Mono', 'Noto Sans HK', monospace;
+  }
+
+  .waybill {
+    width: 820px;
+    background: var(--light);
+    border: 2.5px solid var(--border);
+    box-shadow: 8px 8px 0 var(--dark);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--dark);
+    color: var(--light);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    padding: 18px 24px 14px;
+    border-bottom: 4px solid var(--red);
+  }
+
+  .header-left .carrier {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #fff;
+  }
+  .header-left .carrier span {
+    color: var(--red);
+  }
+  .header-left .subtitle {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: #aaa;
+    margin-top: 3px;
+    text-transform: uppercase;
+  }
+
+  .header-right {
+    text-align: right;
+  }
+  .doc-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .bol {
+    font-size: 19px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+  }
+  .bol-label {
+    font-size: 9px;
+    color: #888;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* ── STATUS BANNER ── */
+  .status-banner {
+    background: var(--warn);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 5px 0;
+  }
+
+  /* ── BODY GRID ── */
+  .body {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Section title strip */
+  .sec-title {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--light);
+    background: var(--mid);
+    padding: 4px 8px;
+    margin-bottom: 0;
+  }
+
+  /* ── TWO-COL PARTY BLOCK ── */
+  .parties {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    border: 1.5px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .party-divider {
+    background: var(--border);
+  }
+  .party {
+    padding: 12px 14px;
+  }
+  .party .label {
+    font-size: 8px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+  .party .value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--dark);
+    line-height: 1.55;
+  }
+  .party .sub {
+    font-size: 10px;
+    color: var(--mid);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  /* ── META ROW ── */
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border: 1.5px solid var(--border);
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+  .meta-cell {
+    padding: 10px 12px;
+    border-right: 1px solid var(--border);
+  }
+  .meta-cell:last-child { border-right: none; }
+  .meta-cell .label {
+    font-size: 7.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .meta-cell .value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dark);
+  }
+  .meta-cell .value.critical {
+    color: var(--warn);
+    font-weight: 700;
+  }
+
+  /* ── GOODS TABLE ── */
+  .goods-wrapper {
+    border: 1.5px solid var(--border);
+    margin-bottom: 12px;
+    margin-top: 12px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+  }
+  thead tr {
+    background: var(--dark);
+    color: #fff;
+  }
+  thead th {
+    padding: 7px 10px;
+    text-align: left;
+    font-size: 8px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  tbody tr {
+    border-bottom: 1px solid #ddd;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td {
+    padding: 10px 10px;
+    color: var(--dark);
+    vertical-align: top;
+  }
+  .cn {
+    font-family: 'Noto Sans HK', sans-serif;
+    font-weight: 500;
+  }
+  td.amt { font-weight: 700; text-align: right; }
+  .totals-row td {
+    background: #EDEAE2;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 9px 10px;
+  }
+  .totals-row td:first-child { color: var(--mid); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .totals-row td.amt { color: var(--dark); font-size: 14px; }
+
+  /* ── TAX NOTICE ── */
+  .tax-notice {
+    border: 1.5px solid var(--gold);
+    background: #FBF8EE;
+    padding: 9px 14px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .tax-notice .icon {
+    font-size: 16px;
+    color: var(--gold);
+    flex-shrink: 0;
+  }
+  .tax-notice .text {
+    font-size: 10px;
+    color: #6B5A1A;
+    line-height: 1.55;
+  }
+  .tax-notice .text strong {
+    color: var(--gold);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── DECLARATIONS ── */
+  .declarations {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .decl-box {
+    border: 1.5px solid var(--border);
+    padding: 11px 13px;
+  }
+  .decl-box .label {
+    font-size: 8px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .decl-box .value {
+    font-size: 11.5px;
+    color: var(--dark);
+    line-height: 1.55;
+  }
+
+  /* ── SIGNATURE STRIP ── */
+  .sig-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border: 1.5px solid var(--border);
+    margin-bottom: 0;
+  }
+  .sig-cell {
+    padding: 14px 14px 10px;
+    border-right: 1px solid var(--border);
+  }
+  .sig-cell:last-child { border-right: none; }
+  .sig-cell .label {
+    font-size: 7.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--mid);
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .sig-line {
+    border-top: 1.5px solid var(--border);
+    margin-top: 8px;
+    padding-top: 4px;
+    font-size: 8.5px;
+    color: #999;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    background: var(--dark);
+    color: #666;
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 8px 24px;
+    display: flex;
+    justify-content: space-between;
+    border-top: 2px solid var(--red);
+  }
+  .footer span { color: #999; }
+
+  /* Barcode strip */
+  .barcode-strip {
+    background: var(--light);
+    border-top: 1.5px solid var(--border);
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .bars {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 36px;
+  }
+  .bars span {
+    display: block;
+    background: var(--dark);
+    width: 2px;
+  }
+  .barcode-num {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    color: var(--dark);
+  }
+  .barcode-sub {
+    font-size: 7.5px;
+    color: #999;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* watermark */
+  .watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-35deg);
+    font-size: 90px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: rgba(192, 39, 45, 0.035);
+    text-transform: uppercase;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 0;
+  }
+  .waybill > *:not(.watermark) { position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+<div class="waybill">
+  <div class="watermark">ORIGINAL</div>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="carrier">SF<span> EXPRESS</span> <span style="color:#aaa;font-size:15px;">順豐速運</span></div>
+      <div class="subtitle">Hong Kong International Freight &nbsp;·&nbsp; 香港國際貨運</div>
+    </div>
+    <div class="header-right">
+      <div class="bol-label">Bill of Lading No. / 提單號碼</div>
+      <div class="bol">SF-HK-2026-047821</div>
+      <div class="doc-title">Air Waybill &nbsp;·&nbsp; 空運提單</div>
+    </div>
+  </div>
+
+  <!-- CRITICAL STATUS BANNER -->
+  <div class="status-banner">⚠ &nbsp;STATUS: CRITICAL &nbsp;·&nbsp; 15 DAYS IN TRANSIT &nbsp;·&nbsp; IMMEDIATE ACTION REQUIRED &nbsp;·&nbsp; 需即時跟進</div>
+
+  <div class="body">
+
+    <!-- PARTIES -->
+    <div class="sec-title">Shipper / Consignee &nbsp;·&nbsp; 寄件人 / 收件人</div>
+    <div class="parties">
+      <div class="party">
+        <div class="label">Shipper / 寄件人</div>
+        <div class="value">Hong Kong Trade Co. Ltd.<br><span class="cn">香港貿易有限公司</span></div>
+        <div class="sub">
+          Unit 1205, Millennium City 6<br>
+          39 Kwun Tong Rd, Kowloon<br>
+          九龍觀塘道39號<br>
+          Tel: +852 2345 6789
+        </div>
+      </div>
+      <div class="party-divider"></div>
+      <div class="party">
+        <div class="label">Consignee / 收件人</div>
+        <div class="value">London Fashion Hub</div>
+        <div class="sub">
+          22 Baker Street<br>
+          London, W1U 3BW<br>
+          United Kingdom 英國<br>
+          Tel: +44 20 7946 0320
+        </div>
+      </div>
+    </div>
+
+    <!-- META GRID -->
+    <div class="sec-title">Shipment Details &nbsp;·&nbsp; 貨運資料</div>
+    <div class="meta-grid">
+      <div class="meta-cell">
+        <div class="label">Date of Departure / 出發日期</div>
+        <div class="value critical">28 APR 2026</div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">Origin / 出發地</div>
+        <div class="value">Hong Kong (HKG)<br><span style="font-size:10px;color:#666;">香港</span></div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">Destination / 目的地</div>
+        <div class="value">London (LHR)<br><span style="font-size:10px;color:#666;">倫敦</span></div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">Carrier / 承運人</div>
+        <div class="value">SF Express (HK)<br><span style="font-size:10px;color:#666;">順豐速運</span></div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">Service Type / 服務類型</div>
+        <div class="value">Priority Air<br><span style="font-size:10px;color:#666;">優先空運</span></div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">No. of Packages / 件數</div>
+        <div class="value">2 Pkgs</div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">Gross Weight / 毛重</div>
+        <div class="value">3.80 KG</div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">Incoterms</div>
+        <div class="value">DAP London</div>
+      </div>
+    </div>
+
+    <!-- GOODS TABLE -->
+    <div class="sec-title" style="margin-top:12px;">Description of Goods &nbsp;·&nbsp; 貨物描述</div>
+    <div class="goods-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:32px;">#</th>
+            <th>HS Code</th>
+            <th>Description of Goods / 貨物描述</th>
+            <th>Qty / 數量</th>
+            <th>Unit Weight</th>
+            <th style="text-align:right;">Declared Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>01</td>
+            <td>4202.21</td>
+            <td>
+              <span class="cn" style="font-size:13px;font-weight:600;">手袋</span>
+              <span style="color:#666;"> (Handbag)</span><br>
+              <span style="font-size:9px;color:#999;">Leather fashion handbag &nbsp;·&nbsp; 皮革時裝手袋</span>
+            </td>
+            <td>1 pc</td>
+            <td>1.50 kg</td>
+            <td class="amt">HKD 30.00</td>
+          </tr>
+          <tr>
+            <td>02</td>
+            <td>8487.90</td>
+            <td>
+              <span class="cn" style="font-size:13px;font-weight:600;">零件</span>
+              <span style="color:#666;"> (Spare Parts)</span><br>
+              <span style="font-size:9px;color:#999;">Mechanical components, non-electrical &nbsp;·&nbsp; 機械零件（非電氣）</span>
+            </td>
+            <td>1 set</td>
+            <td>2.30 kg</td>
+            <td class="amt">HKD 20.00</td>
+          </tr>
+          <tr class="totals-row">
+            <td colspan="5">Total Declared Value &nbsp;·&nbsp; 申報總值</td>
+            <td class="amt">HKD 50.00</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- TAX NOTICE -->
+    <div class="tax-notice">
+      <div class="icon">⚑</div>
+      <div class="text">
+        <strong>HK TAX FLOOR NOTICE:</strong>&nbsp;
+        Total declared value HKD 50.00 is subject to the minimum tax floor of
+        <strong>HKD 0.20</strong>. Applicable duties and import VAT (UK rate 20%) will be assessed
+        at destination. &nbsp;·&nbsp;
+        <span class="cn">申報總值港幣50.00元，適用最低稅額港幣0.20元，英國入口增值稅另計。</span>
+      </div>
+    </div>
+
+    <!-- DECLARATIONS -->
+    <div class="sec-title">Declarations &nbsp;·&nbsp; 申報</div>
+    <div class="declarations">
+      <div class="decl-box">
+        <div class="label">Country of Origin / 原產地</div>
+        <div class="value">
+          Hong Kong SAR, China<br>
+          <span class="cn" style="font-size:11px;color:#666;">中國香港特別行政區</span>
+        </div>
+      </div>
+      <div class="decl-box">
+        <div class="label">Currency / 貨幣</div>
+        <div class="value">Hong Kong Dollar (HKD)<br><span class="cn" style="font-size:11px;color:#666;">港元</span></div>
+      </div>
+      <div class="decl-box">
+        <div class="label">Reason for Export / 出口原因</div>
+        <div class="value">Commercial Sale &nbsp;·&nbsp; <span class="cn">商業銷售</span></div>
+      </div>
+      <div class="decl-box">
+        <div class="label">Shipment Type / 貨件類型</div>
+        <div class="value">Non-Documents &nbsp;·&nbsp; <span class="cn">非文件</span></div>
+      </div>
+    </div>
+
+    <!-- SHIPPER DECLARATION -->
+    <div class="decl-box" style="margin-bottom:12px;">
+      <div class="label">Shipper's Declaration &nbsp;·&nbsp; 寄件人聲明</div>
+      <div class="value" style="font-size:10.5px;line-height:1.7;color:#444;">
+        I hereby certify that the particulars on the face hereof are correct and that insofar as any part of the consignment contains dangerous goods, such part is properly described by name and is in proper condition for carriage by air according to applicable Dangerous Goods Regulations.<br>
+        <span class="cn" style="font-size:10px;color:#777;">本人茲聲明，以上所填各項均屬正確，並確認貨物符合國際航空危險品規例。</span>
+      </div>
+    </div>
+
+    <!-- SIGNATURES -->
+    <div class="sig-strip">
+      <div class="sig-cell">
+        <div class="label">Shipper's Signature / 寄件人簽署</div>
+        <div style="height:30px;"></div>
+        <div class="sig-line">Authorised Signatory &nbsp;·&nbsp; 授權簽署人</div>
+      </div>
+      <div class="sig-cell">
+        <div class="label">Date Issued / 簽發日期</div>
+        <div style="height:30px;font-size:14px;font-weight:700;color:var(--dark);padding-top:8px;">13 MAY 2026</div>
+        <div class="sig-line">Document Issue Date</div>
+      </div>
+      <div class="sig-cell">
+        <div class="label">Carrier's Stamp / 承運人印章</div>
+        <div style="height:30px;border:1.5px dashed #ccc;margin-top:4px;display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:9px;color:#bbb;letter-spacing:0.1em;">SF EXPRESS OFFICIAL SEAL</span>
+        </div>
+        <div class="sig-line">順豐速運官方印章</div>
+      </div>
+    </div>
+
+  </div><!-- end body -->
+
+  <!-- BARCODE STRIP -->
+  <div class="barcode-strip">
+    <div>
+      <div class="bars" id="bars"></div>
+    </div>
+    <div>
+      <div class="barcode-num">SF-HK-2026-047821</div>
+      <div class="barcode-sub">Scan for tracking &nbsp;·&nbsp; 掃碼追蹤</div>
+    </div>
+    <div style="margin-left:auto;text-align:right;">
+      <div style="font-size:9px;color:#999;letter-spacing:0.1em;">COPY 1 OF 3 &nbsp;·&nbsp; 第一聯（共三聯）</div>
+      <div style="font-size:9px;color:#999;margin-top:2px;">FOR CUSTOMS / 海關存根</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>SF Express (Hong Kong) Ltd. &nbsp;·&nbsp; 順豐速運（香港）有限公司</span>
+    <span>Doc Ref: WB-HKG-LHR-20260428-047821 &nbsp;·&nbsp; Generated: 13 MAY 2026</span>
+  </div>
+
+</div>
+
+<script>
+  // Generate pseudo-barcode bars
+  const bars = document.getElementById('bars');
+  const widths = [2,1,3,1,2,1,1,3,2,1,3,2,1,1,2,3,1,2,1,3,1,1,2,1,3,2,1,2,3,1,1,2,3,1,2,1,3,2,1,1,3,1,2,3,1,2,1,1,3,2];
+  const heights = [36,28,36,22,36,24,28,36,20,36,32,36,22,36,28,36,24,36,20,36,28,32,36,24,36,28,36,20,36,24,28,36,22,36,28,20,36,32,36,24];
+  widths.forEach((w, i) => {
+    const b = document.createElement('span');
+    b.style.width = w + 'px';
+    b.style.height = heights[i] + 'px';
+    bars.appendChild(b);
+  });
+</script>
+</body>
+</html>

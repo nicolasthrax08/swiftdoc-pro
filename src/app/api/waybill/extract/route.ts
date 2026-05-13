@@ -22,6 +22,7 @@
  *     "total_value_hkd": <number|null>,
  *     "hkhs_code": "<8-digit string|null>",
  *     "confidence_score": <number|null>,
+ *     "manual_review_recommended": <boolean>,
  *     "raw_extraction": { ... }
  *   }
  *
@@ -166,6 +167,7 @@ export async function POST(req: NextRequest) {
         total_value_hkd: result.total_value_hkd,
         hkhs_code: result.hkhs_code,
         confidence_score: result.confidence_score,
+        manual_review_recommended: result.manual_review_recommended,
         raw_extraction: result.raw_extraction,
       },
       { status: 200 },

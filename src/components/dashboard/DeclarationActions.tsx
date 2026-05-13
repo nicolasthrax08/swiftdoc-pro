@@ -28,6 +28,7 @@ export function DeclarationActions({
       <TriggerFilingButton declarationId={declarationId} disabled={!canTrigger} />
 
       <button
+        type="button"
         className="inline-flex items-center gap-2 rounded px-4 py-2 text-sm font-medium"
         style={{
           background: "transparent",
@@ -43,6 +44,7 @@ export function DeclarationActions({
       </button>
 
       <button
+        type="button"
         onClick={scrollToRaw}
         className="inline-flex items-center gap-2 rounded px-4 py-2 text-sm font-medium transition-colors"
         style={{

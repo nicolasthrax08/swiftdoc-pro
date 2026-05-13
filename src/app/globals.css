@@ -3,6 +3,13 @@
 @theme {
   --color-ink: #0b1220;
   --shadow-soft: 0 24px 80px rgba(15, 23, 42, 0.12);
+
+  /* SwiftDoc Dashboard palette */
+  --color-night-ink: #0b1b2b;
+  --color-stone-blue: #4a5a6d;
+  --color-sage: #8a9a8c;
+  --color-surface: #132030;
+  --color-border: #243447;
 }
 
 @layer base {
@@ -33,5 +40,12 @@
   a {
     color: inherit;
     text-decoration: none;
+  }
+
+  /* Dashboard body override — applied on .dashboard-body */
+  .dashboard-body {
+    background: #0b1b2b;
+    background-image: none;
+    color: #ffffff;
   }
 }

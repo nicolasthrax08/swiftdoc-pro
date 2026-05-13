@@ -33,6 +33,7 @@ import {
   SKYVERN_SUCCESS_STATUSES,
   type FilingErrorCode,
   type FilingPipelineResult,
+  type SkyvernTaskResponse,
   type TdecFormData,
 } from "@/lib/skyvern/types";
 
@@ -187,7 +188,7 @@ export async function runFilingPipeline(
   // ------------------------------------------------------------------
   // 5. Retrieve credentials from Vault
   // ------------------------------------------------------------------
-  let cred;
+  let cred: Awaited<ReturnType<typeof getTradelinkCredential>> | null = null;
   try {
     cred = await getTradelinkCredential(declaration.tenant_id);
     await appendAudit(admin, jobId, {
@@ -234,7 +235,7 @@ export async function runFilingPipeline(
   // Zero out the credential reference immediately — we don't need it again
   cred = null;
 
-  let skyvernTask;
+  let skyvernTask: SkyvernTaskResponse | undefined;
   try {
     skyvernTask = await createSkyvernTask(taskRequest);
     await appendAudit(admin, jobId, {
@@ -289,8 +290,9 @@ export async function runFilingPipeline(
   // ------------------------------------------------------------------
   // 7. Poll until terminal status
   // ------------------------------------------------------------------
-  let finalTask;
+  let finalTask: SkyvernTaskResponse;
   try {
+    if (!skyvernTask) throw new Error("skyvernTask unexpectedly undefined");
     finalTask = await pollSkyvernTask(skyvernTask.task_id, {
       maxAttempts: 72,    // 72 × 5s = 6 minutes
       intervalMs: 5_000,
@@ -423,7 +425,7 @@ async function appendAudit(
 async function failJob(
   admin: AdminClient,
   jobId: string,
-  declarationId: string,
+  _declarationId: string,
   errorCode: string,
   errorMsg: string,
 ) {

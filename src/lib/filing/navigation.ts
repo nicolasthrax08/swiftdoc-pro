@@ -133,7 +133,7 @@ function buildNavigationGoal(formData: TdecFormData): string {
     "3. If login fails, stop immediately and report AUTH_FAILED.",
     "4. After a successful login, navigate to the Trade Declaration " +
       "(TDEC) submission page.",
-    "5. Select declaration type: " + formData.declaration_type + ".",
+    `5. Select declaration type: ${formData.declaration_type}.`,
     "6. Fill in all form fields using the values in navigation_payload:",
     "   - Declarant name: navigation_payload.declarant_name",
     "   - Shipment reference: navigation_payload.shipment_ref",

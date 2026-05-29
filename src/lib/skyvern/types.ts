@@ -64,6 +64,9 @@ export interface SkyvernExtractedInformation {
    */
   tradelink_ref?: string | null;
   confirmation_screenshot_url?: string | null;
+  /** Set when the agent stops at Review Declaration for human approval */
+  review_declaration_pending?: boolean | null;
+  review_declaration_screenshot_url?: string | null;
   raw?: unknown;
 }
 
@@ -130,6 +133,8 @@ export interface TdecFormData {
   unit: string;
   /** CIF / FOB value in HKD */
   value_hkd: number;
+  /** Ad valorem fee in HKD (0.3% rule with HK$0.20 floor) for TDEC export */
+  ad_valorem_tax_hkd?: number;
   /** Ad valorem duty rate (0–1, e.g. 0.05 = 5%) */
   duty_rate?: number;
   /** Additional fields passed through to the portal */

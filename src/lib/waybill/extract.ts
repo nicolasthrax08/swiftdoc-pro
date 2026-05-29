@@ -4,14 +4,18 @@
  * Pipeline:
  *   1. Primary Gemini call — extract consignee, date, value, product description
  *   2. If confidence < FALLBACK_THRESHOLD, run fallback extraction prompt
- *   3. Second Gemini call — map product description to 8-digit HKHS code
- *   4. Validate and normalise the result
- *   5. Persist to Supabase `waybill_extractions`
+ *   3. Apply Cantonese→English glossary to product text (deterministic pass
+ *      before HKHS seed lookup / HS Gemini call).
+ *   4. Second Gemini call — map product description to 8-digit HKHS code
+ *   5. Validate and normalise the result; flag low-confidence rows for manual review
+ *   6. Persist to Supabase `waybill_extractions`
  */
 
 import {
+  applyCantoneseWaybillGlossary,
   callGemini,
   extractResponseText,
+  shouldRecommendManualReview,
   type GeminiPart,
   type GeminiResponse,
 } from "@/lib/gemini/client";
@@ -20,7 +24,6 @@ import {
   buildExtractionPrompt,
   buildFallbackExtractionPrompt,
   buildHsCodePrompt,
-  WAYBILL_SYSTEM_INSTRUCTION,
 } from "./prompts";
 import { lookupHkhsCode } from "./hkhs-seed";
 
@@ -32,7 +35,7 @@ import { lookupHkhsCode } from "./hkhs-seed";
 const FALLBACK_THRESHOLD = 0.6;
 
 /** Regex for validating 8-digit HKHS code. */
-const HKHS_CODE_REGEX = /^\d{8}$/;
+const HKHS_REGEX = /^\d{8}$/;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -62,6 +65,8 @@ export interface WaybillExtractionResult {
   hkhs_code: string | null;
   /** AI confidence score 0.0–1.0. */
   confidence_score: number | null;
+  /** True when extraction / HS confidence is low or HKHS code is missing. */
+  manual_review_recommended: boolean;
   /** Full raw Gemini responses for auditability. */
   raw_extraction: {
     primary: GeminiResponse;
@@ -70,6 +75,9 @@ export interface WaybillExtractionResult {
     primary_parsed: unknown;
     fallback_parsed?: unknown;
     hs_code_parsed?: unknown;
+    manual_review_recommended?: boolean;
+    /** Product string passed into HKHS resolution after glossary normalisation. */
+    hs_resolution_input_description?: string | null;
   };
 }
 
@@ -139,7 +147,6 @@ async function runExtractionStage(
 
   const primaryResponse = await callGemini({
     parts,
-    systemInstruction: WAYBILL_SYSTEM_INSTRUCTION,
     generationConfig: {
       temperature: 0.05,
       topP: 0.95,
@@ -176,7 +183,6 @@ async function runExtractionStage(
 
     const fallbackResponse = await callGemini({
       parts: fallbackParts,
-      systemInstruction: WAYBILL_SYSTEM_INSTRUCTION,
       generationConfig: {
         temperature: 0.15,
         topP: 0.98,
@@ -237,7 +243,6 @@ async function resolveHsCode(
 
   const response = await callGemini({
     parts: [{ text: buildHsCodePrompt(productDescription) }],
-    systemInstruction: WAYBILL_SYSTEM_INSTRUCTION,
     generationConfig: {
       temperature: 0.05,
       maxOutputTokens: 256,
@@ -253,7 +258,7 @@ async function resolveHsCode(
 
   // Validate 8-digit format
   const code = String(parsed.hkhs_code).trim();
-  if (!HKHS_CODE_REGEX.test(code)) {
+  if (!HKHS_REGEX.test(code)) {
     return { code: null, response, parsed };
   }
 
@@ -298,12 +303,17 @@ export async function extractWaybill(
   const { primaryResponse, fallbackResponse, parsed, usedFallback } =
     await runExtractionStage(input);
 
-  // Stage 2 — HS code resolution
+  const productRaw = parsed.product_description?.trim() || null;
+  const productForHs = productRaw
+    ? applyCantoneseWaybillGlossary(productRaw).trim() || null
+    : null;
+
+  // Stage 2 — HS code resolution (glossary-normalised description only)
   const {
     code: hkhsCode,
     response: hsCodeResponse,
     parsed: hsCodeParsed,
-  } = await resolveHsCode(parsed.product_description);
+  } = await resolveHsCode(productForHs);
 
   // Normalise fields
   const consignee = parsed.consignee?.trim() || null;
@@ -313,6 +323,17 @@ export async function extractWaybill(
     parsed.confidence_score != null
       ? Math.max(0, Math.min(1, Number(parsed.confidence_score)))
       : null;
+
+  const hsConfidence =
+    hsCodeParsed?.confidence != null
+      ? Math.max(0, Math.min(1, Number(hsCodeParsed.confidence)))
+      : null;
+
+  const manualReviewRecommended = shouldRecommendManualReview({
+    extractionConfidence: confidenceScore,
+    hkhsConfidence: hsConfidence,
+    hkhsCode: hkhsCode,
+  });
 
   // Build raw_extraction blob for auditability
   const rawExtraction = {
@@ -328,6 +349,8 @@ export async function extractWaybill(
         }
       : {}),
     ...(hsCodeParsed ? { hs_code_parsed: hsCodeParsed } : {}),
+    hs_resolution_input_description: productForHs,
+    manual_review_recommended: manualReviewRecommended,
   };
 
   // Persist to Supabase
@@ -359,6 +382,7 @@ export async function extractWaybill(
     total_value_hkd: totalValueHkd,
     hkhs_code: hkhsCode,
     confidence_score: confidenceScore,
+    manual_review_recommended: manualReviewRecommended,
     raw_extraction: rawExtraction,
   };
 }

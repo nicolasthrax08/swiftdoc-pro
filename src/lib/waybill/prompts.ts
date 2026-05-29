@@ -21,6 +21,16 @@ You are an expert in Hong Kong trade compliance and customs documentation.
 You specialise in reading mixed Traditional Chinese (Cantonese) and English
 shipping waybills used in HKSAR cross-border logistics.
 
+Cantonese-to-English glossary (waybill extraction):
+When extracting or translating goods, consignee, dates, and values from the
+waybill, apply these mappings literally so downstream HS classification uses
+consistent English product wording (examples below; extend by analogy for
+similar compounds).
+
+The same term pairs are applied programmatically to the product_description
+field before HKHS seed lookup / HS-code resolution (see applyCantoneseWaybillGlossary
+in src/lib/gemini/client.ts) — keep both lists aligned.
+
 Key bilingual term mappings you must apply:
   手袋       → Handbag
   電子產品   → Electronics
@@ -121,6 +131,9 @@ export function buildHsCodePrompt(productDescription: string): string {
 You are a Hong Kong Customs & Excise Department classification expert.
 Map the following product description to the most appropriate 8-digit
 HKHS (Hong Kong Harmonized System) commodity code.
+
+The description has already been normalised from common Cantonese waybill
+terms to English where applicable (e.g. 手袋 → Handbag).
 
 ${seedBlock}
 

@@ -46,6 +46,8 @@ export interface Declaration {
   declaration_data: DeclarationData;
   tradelink_ref: string | null;
   filing_deadline: string | null;
+  /** Persisted HK$ ad valorem tax (see compliance migration) */
+  ad_valorem_tax?: number | null;
   created_at: string;
   updated_at: string;
   filed_at: string | null;

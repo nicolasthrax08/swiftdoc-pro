@@ -36,6 +36,7 @@ import {
   type SkyvernTaskResponse,
   type TdecFormData,
 } from "@/lib/skyvern/types";
+import type { Declaration } from "@/lib/supabase/types";
 
 // ----------------------------------------------------------------
 // Constants
@@ -74,7 +75,7 @@ export async function runFilingPipeline(
   const { data: declaration, error: decError } = await admin
     .from("declarations")
     .select(
-      "id, tenant_id, status, declaration_data, filing_deadline, tradelink_ref",
+      "id, tenant_id, status, declaration_data, filing_deadline, tradelink_ref, ad_valorem_tax",
     )
     .eq("id", declarationId)
     .single();
@@ -229,7 +230,13 @@ export async function runFilingPipeline(
   // ------------------------------------------------------------------
   // 6. Build and submit Skyvern task
   // ------------------------------------------------------------------
-  const formData = declaration.declaration_data as TdecFormData;
+  const declRow = declaration as Declaration;
+  const formData: TdecFormData = {
+    ...(declRow.declaration_data as TdecFormData),
+    ...(declRow.ad_valorem_tax != null
+      ? { ad_valorem_tax_hkd: Number(declRow.ad_valorem_tax) }
+      : {}),
+  };
   const taskRequest = buildTdecFilingTask(cred, formData, jobId);
 
   // Zero out the credential reference immediately — we don't need it again

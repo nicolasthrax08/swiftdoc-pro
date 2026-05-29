@@ -4,6 +4,7 @@ import { computeDisplayStatus } from "@/lib/supabase/types";
 import Link from "next/link";
 import { SummaryCard } from "@/components/dashboard/SummaryCard";
 import { DeclarationsTable } from "@/components/dashboard/DeclarationsTable";
+import { AutomationMonitor } from "@/components/dashboard/AutomationMonitor";
 
 export const revalidate = 30;
 
@@ -117,6 +118,22 @@ export default async function DashboardPage() {
             month: "short",
           })}
         />
+      </div>
+
+      {/* Automation monitor */}
+      <div
+        className="px-8 py-5"
+        style={{ borderBottom: "1px solid #243447" }}
+      >
+        <div className="mb-3">
+          <h2 className="text-sm font-semibold tracking-tight text-white">
+            Automation Monitor
+          </h2>
+          <p className="text-xs" style={{ color: "#4a5a6d" }}>
+            Vault, agent, and watchdog milestones as they complete.
+          </p>
+        </div>
+        <AutomationMonitor />
       </div>
 
       {/* Recent declarations */}
